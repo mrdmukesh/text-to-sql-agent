@@ -10,6 +10,7 @@ on:
     branches:
       - main
 
+
 jobs:
 
   build:
@@ -24,7 +25,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
 
       - name: Display Python Version
         run: python --version
@@ -37,18 +38,35 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      # -----------------------------
+      # IMPORT VALIDATION
+      # -----------------------------
       - name: Validate Critical Imports
         run: |
           python -c "import streamlit"
           python -c "import pandas"
           python -c "import openai"
 
+      # -----------------------------
+      # SYNTAX CHECK
+      # -----------------------------
       - name: Validate Application Syntax
         run: |
           python -m py_compile app/main.py
           python -m py_compile backend/llm_engine.py
           python -m py_compile backend/sql_generator.py
 
+      # -----------------------------
+      # RUN TESTS (MOCK SAFE)
+      # -----------------------------
+      - name: Run Tests with Pytest + Coverage
+        run: |
+          pip install pytest pytest-cov
+          pytest -v --cov=backend --cov=app --cov-report=term-missing
+
+      # -----------------------------
+      # FINAL BUILD STATUS
+      # -----------------------------
       - name: CI Build Successful
         run: |
-          echo "Build completed successfully"
+          echo "✅ Build completed successfully"
