@@ -1,0 +1,54 @@
+name: GenAI Studio Lab CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Display Python Version
+        run: python --version
+
+      - name: Upgrade Pip
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Validate Critical Imports
+        run: |
+          python -c "import streamlit"
+          python -c "import pandas"
+          python -c "import openai"
+
+      - name: Validate Application Syntax
+        run: |
+          python -m py_compile app/main.py
+          python -m py_compile backend/llm_engine.py
+          python -m py_compile backend/sql_generator.py
+
+      - name: CI Build Successful
+        run: |
+          echo "Build completed successfully"
