@@ -1,5 +1,5 @@
 """
-Streamlit UI for Text-to-SQL Agent (Fixed Version)
+Streamlit UI for Text-to-SQL Agent
 """
 
 import sys
@@ -11,13 +11,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from backend.sql_generator import generate_sql
 from backend.sql_executor import run_sql
+from backend.result_explainer import explain_result
 from data.database import init_db
 from services.history_service import save_history
 from backend.schema_loader import load_schema
 
-
 # ---------- Initialize DB ----------
-print("MAIN.PY LOADED")
 init_db()
 
 # ---------- Page Config ----------
@@ -29,7 +28,6 @@ st.set_page_config(
 
 # ---------- Header ----------
 st.title("🧠 Text to SQL AI Agent")
-
 st.markdown("Ask questions in natural language and get SQL results instantly")
 
 # ---------- Session State ----------
@@ -39,9 +37,9 @@ if "chat" not in st.session_state:
 if "pending_question" not in st.session_state:
     st.session_state.pending_question = None
 
-
 # ---------- Sidebar ----------
 with st.sidebar:
+
     st.header("📌 Sample Queries")
 
     samples = [
@@ -65,32 +63,31 @@ with st.sidebar:
         st.session_state.chat = []
         st.rerun()
 
-
 # ---------- Show Chat History ----------
 for msg in st.session_state.chat:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-
-# ---------- INPUT HANDLING ----------
+# ---------- Input Handling ----------
 query = None
 
-# From sample button
 if st.session_state.get("pending_question"):
     query = st.session_state.pending_question
     st.session_state.pending_question = None
 
-# From chat input
 user_input = st.chat_input("Ask a question about your database...")
+
 if user_input:
     query = user_input
 
-
-# ---------- PROCESS QUERY ----------
+# ---------- Process Query ----------
 if query:
 
-    # Save user message
-    st.session_state.chat.append({"role": "user", "content": query})
+    # Show user message
+    st.session_state.chat.append({
+        "role": "user",
+        "content": query
+    })
 
     with st.chat_message("user"):
         st.write(query)
@@ -106,24 +103,56 @@ if query:
     # ---------- Execute SQL ----------
     result = run_sql(sql)
 
+    # ---------- Generate Natural Language Answer ----------
+    answer = ""
+
+    if "error" not in result:
+        try:
+            answer = explain_result(
+                query,
+                sql,
+                result["rows"]
+            )
+        except Exception as e:
+            answer = f"Unable to generate explanation: {str(e)}"
+
+    # ---------- Display Results ----------
     with st.chat_message("assistant"):
 
+        if answer:
+            st.markdown("### 🤖 Answer")
+            st.success(answer)
+
         if "error" in result:
+
             st.error(result["error"])
 
         else:
+
             rows = result["rows"]
             columns = result["columns"]
 
             if rows:
-                df = pd.DataFrame(rows, columns=columns)
+
+                df = pd.DataFrame(
+                    rows,
+                    columns=columns
+                )
 
                 st.markdown("### 📊 Query Result")
                 st.write(f"Rows Returned: {len(df)}")
 
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(
+                    df,
+                    use_container_width=True
+                )
+
             else:
                 st.info("No records found.")
 
     # ---------- Save History ----------
-    save_history(query, sql, result)
+    save_history(
+        query,
+        sql,
+        result
+    )

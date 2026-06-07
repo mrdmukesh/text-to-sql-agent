@@ -7,9 +7,9 @@ load_dotenv()
 
 api_key = None
 
-if "OPENAI_API_KEY" in st.secrets:
+try:
     api_key = st.secrets["OPENAI_API_KEY"]
-else:
+except Exception:
     api_key = os.getenv("OPENAI_API_KEY")
 
 if not api_key:
