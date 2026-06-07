@@ -1,17 +1,24 @@
 import os
+import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = None
+
+if "OPENAI_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENAI_API_KEY"]
+else:
+    api_key = os.getenv("OPENAI_API_KEY")
 
 if not api_key:
     raise ValueError(
-        "OPENAI_API_KEY not found. Check your .env file."
+        "OPENAI_API_KEY not found."
     )
 
 client = OpenAI(api_key=api_key)
+
 
 def call_openai(prompt: str):
 
@@ -29,10 +36,4 @@ def call_openai(prompt: str):
         ]
     )
 
-    result = response.choices[0].message.content
-
-    #print("\n===== GPT RESPONSE =====")
-    #print(result)
-    #print("========================\n")
-
-    return result
+    return response.choices[0].message.content
