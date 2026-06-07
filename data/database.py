@@ -24,5 +24,16 @@ def init_db():
     cursor.execute("""INSERT OR IGNORE INTO employees (id, name, department, salary)VALUES (1, 'Amit', 'IT', 90000)""")
     cursor.execute("""INSERT OR IGNORE INTO employees (id, name, department, salary)VALUES (2, 'Ravi', 'HR', 60000)""")
     cursor.execute("""INSERT OR IGNORE INTO employees (id, name, department, salary) VALUES (3, 'Neha', 'Finance', 75000)""")
+    
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT,
+            sql TEXT,
+            result TEXT
+        )
+        """)
+
     conn.commit()
     conn.close()
