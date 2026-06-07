@@ -39,6 +39,12 @@ jobs:
           pip install -r requirements.txt
 
       # -----------------------------
+      # IMPORTANT FIX: PYTHONPATH
+      # -----------------------------
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=." >> $GITHUB_ENV
+
+      # -----------------------------
       # IMPORT VALIDATION
       # -----------------------------
       - name: Validate Critical Imports
