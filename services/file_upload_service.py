@@ -9,12 +9,13 @@ UPLOAD_DB = os.path.join(UPLOADS_DIR, "uploaded_data.db")
 
 
 def clean_table_name(filename: str):
-    name = os.path.splitext(filename)[0]
+    name = os.path.splitext(os.path.basename(filename))[0]
     name = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     return name.lower()
 
 
 def save_csv_to_sqlite(uploaded_file):
+
     os.makedirs(UPLOADS_DIR, exist_ok=True)
 
     table_name = clean_table_name(uploaded_file.name)
@@ -37,6 +38,7 @@ def save_csv_to_sqlite(uploaded_file):
 
 
 def get_uploaded_schema():
+
     if not os.path.exists(UPLOAD_DB):
         return ""
 
