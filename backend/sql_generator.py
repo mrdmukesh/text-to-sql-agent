@@ -6,70 +6,73 @@ from services.file_upload_service import get_uploaded_schema
 
 def generate_sql(question: str):
 
-    # -----------------------------
-    # LOAD SCHEMAS
-    # -----------------------------
     static_schema = load_schema()
     uploaded_schema = get_uploaded_schema()
 
-    # -----------------------------
-    # BUILD ACTIVE SCHEMA
-    # -----------------------------
-    if uploaded_schema and "uploaded_data" in uploaded_schema:
+    question_lower = question.lower()
 
+    # Use default employee DB for employee-related questions
+    employee_keywords = [
+        "employee",
+        "employees",
+        "department",
+        "salary",
+        "it employees",
+        "hr employees",
+        "finance employees"
+    ]
+
+    use_static_db = any(keyword in question_lower for keyword in employee_keywords)
+
+    if use_static_db:
         full_schema = f"""
-YOU ARE A STRICT SQL GENERATION ENGINE.
+YOU ARE QUERYING THE DEFAULT EMPLOYEE DATABASE.
 
-YOU MUST FOLLOW THESE RULES:
-- ONLY USE TABLE: uploaded_data
-- NEVER invent tables like employees, sales, etc.
-- NEVER say "unable to answer"
-- ALWAYS return valid SQL
+IMPORTANT RULES:
+- Use ONLY the employees table.
+- Do NOT use uploaded_data.
+- Return ONLY valid SQLite SELECT SQL.
 
-SCHEMA:
+DATABASE SCHEMA:
+{static_schema}
+"""
+    elif uploaded_schema and "uploaded_data" in uploaded_schema:
+        full_schema = f"""
+YOU ARE QUERYING THE USER-UPLOADED CSV DATABASE.
+
+IMPORTANT RULES:
+- Use ONLY the uploaded_data table.
+- Do NOT use employees table.
+- Return ONLY valid SQLite SELECT SQL.
+
+DATABASE SCHEMA:
 {uploaded_schema}
 
 EXAMPLES:
 Question: show all students
 SQL: SELECT * FROM uploaded_data;
 
-Question: marks greater than 80
+Question: show students with marks greater than 80
 SQL: SELECT * FROM uploaded_data WHERE marks > 80;
 """
-
     else:
-
         full_schema = f"""
-YOU ARE A STRICT SQL GENERATION ENGINE.
+YOU ARE QUERYING THE DEFAULT DATABASE.
 
-RULES:
-- ONLY USE GIVEN SCHEMA
-- RETURN ONLY SQL QUERY
+IMPORTANT RULES:
+- Use ONLY the given schema.
+- Return ONLY valid SQLite SELECT SQL.
 
-SCHEMA:
+DATABASE SCHEMA:
 {static_schema}
 """
 
-    # -----------------------------
-    # STRICT PROMPT
-    # -----------------------------
     prompt = SQL_PROMPT.format(
         schema=full_schema,
         question=question
     )
 
-    # -----------------------------
-    # CALL LLM
-    # -----------------------------
     sql = call_openai(prompt)
-
-    # -----------------------------
-    # SAFETY CLEANUP (IMPORTANT)
-    # -----------------------------
-    sql = sql.strip().replace("```sql", "").replace("```", "")
-
-    # block hallucinated fallback answers
-    if "unable" in sql.lower():
-        return "SELECT * FROM uploaded_data"
+    sql = sql.strip().replace("```sql", "").replace("```", "").strip()
 
     return sql
