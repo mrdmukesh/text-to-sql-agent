@@ -12,15 +12,18 @@ try:
 except Exception:
     api_key = os.getenv("OPENAI_API_KEY")
 
-if not api_key:
-    raise ValueError(
-        "OPENAI_API_KEY not found."
-    )
+api_key = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(api_key=api_key)
+client = None
+
+if api_key:
+    client = OpenAI(api_key=api_key)
 
 
 def call_openai(prompt: str):
+
+    if not client:
+        return "MOCK_SQL: SELECT * FROM employees"
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
