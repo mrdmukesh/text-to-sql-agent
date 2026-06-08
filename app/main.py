@@ -7,6 +7,7 @@ import os
 import streamlit as st
 import pandas as pd
 
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from backend.sql_generator import generate_sql
@@ -15,8 +16,11 @@ from backend.result_explainer import explain_result
 from data.database import init_db
 from services.history_service import save_history
 from backend.schema_loader import load_schema
-from services.file_upload_service import save_csv_to_sqlite, get_uploaded_schema
-
+from services.file_upload_service import (
+    save_csv_to_sqlite,
+    get_uploaded_schema,
+    UPLOAD_DB
+)
 
 # ---------------- INIT ----------------
 init_db()
@@ -31,13 +35,16 @@ st.set_page_config(
 st.markdown(
     """
     <h1 style='text-align: center; color: #4A90E2;'>
-    🧠 AI Data Analyst (Text → SQL)
+    🧠 AI Data Analyst
     </h1>
     """,
     unsafe_allow_html=True
 )
 
-st.caption("Upload data or query your database using natural language")
+st.markdown(
+    "<p style='text-align: center;'>Upload CSV files or query your database using natural language.</p>",
+    unsafe_allow_html=True
+)
 
 # ---------------- SESSION ----------------
 if "chat" not in st.session_state:
@@ -51,43 +58,55 @@ if "pending_question" not in st.session_state:
 # SIDEBAR
 # =========================================================
 with st.sidebar:
+    if st.button("🗑️ Clear Uploaded Data"):
+        if os.path.exists(UPLOAD_DB):
+            os.remove(UPLOAD_DB)
+            st.success("Uploaded data cleared.")
+            st.rerun()
+        else:
+            st.info("No uploaded data found.")
 
     st.title("📂 Data Control Panel")
 
-    uploaded_file = st.file_uploader(
-        "Upload CSV File",
-        type=["csv"]
+    uploaded_files = st.file_uploader(
+        "Upload one or more CSV files",
+        type=["csv"],
+        accept_multiple_files=True
     )
 
-    if uploaded_file is not None:
-        try:
-            uploaded_file.seek(0)
+    if uploaded_files:
 
-            df = pd.read_csv(uploaded_file)
+        for uploaded_file in uploaded_files:
 
-            st.success("File Loaded Successfully")
+            try:
+                uploaded_file.seek(0)
 
-            st.subheader("Preview")
-            st.dataframe(df, use_container_width=True)
+                table_name, columns = save_csv_to_sqlite(uploaded_file)
 
-            uploaded_file.seek(0)
-            cols = save_csv_to_sqlite(uploaded_file)
+                st.success(f"Uploaded: {uploaded_file.name}")
+                st.write(f"Created table: `{table_name}`")
+                st.write("Columns:")
+                st.write(columns)
 
-            st.subheader("Detected Columns")
-            st.write(cols)
+                uploaded_file.seek(0)
+                df_preview = pd.read_csv(uploaded_file)
 
-        except Exception as e:
-            st.error(f"Upload Error: {str(e)}")
+                with st.expander(f"Preview {uploaded_file.name}"):
+                    st.dataframe(df_preview)
+
+            except Exception as e:
+                st.error(f"Upload failed for {uploaded_file.name}: {str(e)}")
 
     st.markdown("---")
 
     st.subheader("📌 Sample Queries")
 
     samples = [
-        "show all students",
-        "students with marks greater than 80",
-        "average marks",
-        "count students"
+        "Where does Mukesh Dabi live?",
+        "Show all persons with their city",
+        "Show Mukesh Dabi contact details",
+        "Which person lives in Bangalore?",
+        "show all employees"
     ]
 
     for q in samples:
@@ -98,7 +117,9 @@ with st.sidebar:
     st.markdown("---")
 
     st.subheader("📐 Database Schema")
-    st.code(load_schema() + "\n" + get_uploaded_schema(), language="text")
+
+    current_schema = load_schema() + "\n" + get_uploaded_schema()
+    st.code(current_schema, language="text")
 
     if st.button("🧹 Clear Chat"):
         st.session_state.chat = []
@@ -133,35 +154,41 @@ if user_input:
 # =========================================================
 if query:
 
-    st.session_state.chat.append({"role": "user", "content": query})
+    st.session_state.chat.append(
+        {
+            "role": "user",
+            "content": query
+        }
+    )
 
     with st.chat_message("user"):
         st.write(query)
 
-    # ---------------- SQL GENERATION (FIX HERE) ----------------
-    static_schema = load_schema()
-    dynamic_schema = get_uploaded_schema()
-
-    full_schema = static_schema + "\n" + dynamic_schema
-
+    # ---------------- GENERATE SQL ----------------
     sql = generate_sql(query)
-    sql = sql.strip().replace("```sql", "").replace("```", "")
+    sql = sql.strip().replace("```sql", "").replace("```", "").strip()
 
     with st.chat_message("assistant"):
         st.markdown("### 🧠 Generated SQL")
         st.code(sql, language="sql")
 
-    # ---------------- EXECUTE ----------------
+    # ---------------- EXECUTE SQL ----------------
     result = run_sql(sql)
 
+    # ---------------- NATURAL LANGUAGE ANSWER ----------------
     answer = ""
 
     if "error" not in result:
         try:
-            answer = explain_result(query, sql, result["rows"])
+            answer = explain_result(
+                query,
+                sql,
+                result["rows"]
+            )
         except Exception as e:
-            answer = str(e)
+            answer = f"Unable to generate explanation: {str(e)}"
 
+    # ---------------- DISPLAY RESULT ----------------
     with st.chat_message("assistant"):
 
         if answer:
@@ -170,16 +197,27 @@ if query:
 
         if "error" in result:
             st.error(result["error"])
+
         else:
             rows = result["rows"]
-            cols = result["columns"]
+            columns = result["columns"]
 
             if rows:
-                df = pd.DataFrame(rows, columns=cols)
+                df = pd.DataFrame(
+                    rows,
+                    columns=columns
+                )
+
                 st.markdown("### 📊 Result")
                 st.write(f"Rows: {len(df)}")
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df)
+
             else:
                 st.info("No data found")
 
-    save_history(query, sql, result)
+    # ---------------- SAVE HISTORY ----------------
+    save_history(
+        query,
+        sql,
+        result
+    )

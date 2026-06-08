@@ -9,62 +9,29 @@ def generate_sql(question: str):
     static_schema = load_schema()
     uploaded_schema = get_uploaded_schema()
 
-    question_lower = question.lower()
+    full_schema = f"""
+YOU ARE A STRICT SQLITE SQL GENERATOR.
 
-    # Use default employee DB for employee-related questions
-    employee_keywords = [
-        "employee",
-        "employees",
-        "department",
-        "salary",
-        "it employees",
-        "hr employees",
-        "finance employees"
-    ]
+AVAILABLE DATABASE TABLES:
 
-    use_static_db = any(keyword in question_lower for keyword in employee_keywords)
-
-    if use_static_db:
-        full_schema = f"""
-YOU ARE QUERYING THE DEFAULT EMPLOYEE DATABASE.
-
-IMPORTANT RULES:
-- Use ONLY the employees table.
-- Do NOT use uploaded_data.
-- Return ONLY valid SQLite SELECT SQL.
-
-DATABASE SCHEMA:
+DEFAULT TABLES:
 {static_schema}
-"""
-    elif uploaded_schema and "uploaded_data" in uploaded_schema:
-        full_schema = f"""
-YOU ARE QUERYING THE USER-UPLOADED CSV DATABASE.
 
-IMPORTANT RULES:
-- Use ONLY the uploaded_data table.
-- Do NOT use employees table.
-- Return ONLY valid SQLite SELECT SQL.
-
-DATABASE SCHEMA:
+UPLOADED TABLES:
 {uploaded_schema}
 
-EXAMPLES:
-Question: show all students
-SQL: SELECT * FROM uploaded_data;
-
-Question: show students with marks greater than 80
-SQL: SELECT * FROM uploaded_data WHERE marks > 80;
-"""
-    else:
-        full_schema = f"""
-YOU ARE QUERYING THE DEFAULT DATABASE.
-
 IMPORTANT RULES:
-- Use ONLY the given schema.
-- Return ONLY valid SQLite SELECT SQL.
+1. Use ONLY available tables.
+2. employees table belongs to default database.
+3. uploaded tables belong to uploaded database.
+4. Return ONLY SELECT SQL.
+5. Never explain anything.
+6. Use JOIN when relationships exist.
+7. Use LOWER(column)=LOWER(value) for text matching.
 
-DATABASE SCHEMA:
-{static_schema}
+RELATIONSHIP EXAMPLES:
+persons.person_id = addresses.person_id
+persons.person_id = contacts.person_id
 """
 
     prompt = SQL_PROMPT.format(
@@ -73,6 +40,13 @@ DATABASE SCHEMA:
     )
 
     sql = call_openai(prompt)
-    sql = sql.strip().replace("```sql", "").replace("```", "").strip()
+
+    sql = (
+        sql
+        .strip()
+        .replace("```sql", "")
+        .replace("```", "")
+        .strip()
+    )
 
     return sql
