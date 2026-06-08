@@ -204,3 +204,28 @@ def get_or_create_google_user(name, email):
         "query_limit": new_user[5],
         "query_count": new_user[6]
     }, "Google user created and logged in."
+
+def get_user_analytics():
+    conn = get_auth_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE is_active = 1")
+    active_users = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE is_active = 0")
+    blocked_users = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'")
+    admin_users = cursor.fetchone()[0]
+
+    conn.close()
+
+    return {
+        "total_users": total_users,
+        "active_users": active_users,
+        "blocked_users": blocked_users,
+        "admin_users": admin_users
+    }

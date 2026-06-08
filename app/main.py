@@ -1,5 +1,5 @@
 """
-GenAI Studio Lab - AI Data Analyst with Login, Admin Control and Multi-CSV SQL
+GenAI Studio Lab - Professional Multi-Tool AI Platform
 """
 
 import sys
@@ -16,13 +16,28 @@ from backend.sql_generator import generate_sql
 from backend.sql_executor import run_sql
 from backend.result_explainer import explain_result
 from data.database import init_db
-from services.history_service import save_history
 from backend.schema_loader import load_schema
+
 from services.file_upload_service import (
     save_csv_to_sqlite,
     get_uploaded_schema,
     UPLOAD_DB
 )
+
+from services.insight_service import (
+    get_table_names,
+    load_table_as_df,
+    generate_basic_insights
+)
+
+from services.history_service import (
+    init_history_db,
+    save_history,
+    get_user_history,
+    get_all_history,
+    get_history_analytics
+)
+
 from services.auth_service import (
     init_auth_db,
     register_user,
@@ -31,13 +46,15 @@ from services.auth_service import (
     can_run_query,
     increment_query_count,
     get_all_users,
-    update_user_status
+    update_user_status,
+    get_user_analytics
 )
 
 
 # ---------------- INIT ----------------
 init_db()
 init_auth_db()
+init_history_db()
 
 st.set_page_config(
     page_title="GenAI Studio Lab",
@@ -74,7 +91,7 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if "selected_tool" not in st.session_state:
-    st.session_state.selected_tool = "Text-to-SQL"
+    st.session_state.selected_tool = "🏠 Dashboard"
 
 
 # =========================================================
@@ -88,7 +105,7 @@ if st.session_state.user is None:
         🧠 GenAI Studio Lab
         </h1>
         <p style='text-align: center; font-size: 18px;'>
-        Login to access AI tools, data analysis and productivity features.
+        Secure AI tools for data analysis, automation and creativity.
         </p>
         """,
         unsafe_allow_html=True
@@ -112,7 +129,6 @@ if st.session_state.user is None:
             )
 
             if result and "token" in result:
-
                 token = result["token"]
 
                 headers = {
@@ -154,10 +170,7 @@ if st.session_state.user is None:
             )
 
             if st.button("Login", use_container_width=True):
-                user, msg = login_user(
-                    login_email,
-                    login_password
-                )
+                user, msg = login_user(login_email, login_password)
 
                 if user:
                     st.session_state.user = user
@@ -196,19 +209,17 @@ if st.session_state.user is None:
 
 
 # =========================================================
-# MAIN APP HEADER
+# APP HEADER
 # =========================================================
 st.markdown(
     """
     <h1 style='text-align: center; color: #4A90E2;'>
     🧠 GenAI Studio Lab
     </h1>
+    <p style='text-align: center; font-size: 16px;'>
+    AI-powered data analysis, SQL intelligence and future creative tools.
+    </p>
     """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    "<p style='text-align: center;'>AI tools for data, automation and creativity.</p>",
     unsafe_allow_html=True
 )
 
@@ -236,14 +247,14 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.subheader("🧰 AI Tools")
-
     selected_tool = st.radio(
-        "Choose a tool",
+        "🚀 Select Tool",
         [
-            "Text-to-SQL",
-            "Animal Face Transformer",
-            "Bird Voice Generator"
+            "🏠 Dashboard",
+            "📊 Text-to-SQL",
+            "📈 AI Data Insights + Charts",
+            "🐯 Animal Face Transformer",
+            "🐦 Bird Voice Generator"
         ]
     )
 
@@ -251,9 +262,84 @@ with st.sidebar:
 
     st.markdown("---")
 
+    st.subheader("📂 Data Upload")
+
+    uploaded_files = st.file_uploader(
+        "Upload CSV files",
+        type=["csv"],
+        accept_multiple_files=True
+    )
+
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            try:
+                uploaded_file.seek(0)
+
+                table_name, columns = save_csv_to_sqlite(uploaded_file)
+
+                st.success(f"Uploaded: {uploaded_file.name}")
+                st.caption(f"Table: {table_name}")
+                st.write(columns)
+
+                uploaded_file.seek(0)
+                df_preview = pd.read_csv(uploaded_file)
+
+                with st.expander(f"Preview {uploaded_file.name}"):
+                    st.dataframe(df_preview)
+
+            except Exception as e:
+                st.error(f"Upload failed for {uploaded_file.name}: {str(e)}")
+
+    st.markdown("---")
+
+    with st.expander("🕘 My Recent Queries", expanded=False):
+        history_rows = get_user_history(st.session_state.user["id"])
+
+        if history_rows:
+            for h in history_rows:
+                question, sql_query, answer, status, created_at = h
+                st.markdown(f"**{created_at}**")
+                st.write(question)
+                st.code(sql_query, language="sql")
+                st.caption(status)
+                st.markdown("---")
+        else:
+            st.info("No history yet.")
+
     if st.session_state.user["role"] == "admin":
 
         with st.expander("🛡️ Admin Panel", expanded=False):
+
+            st.subheader("📊 Analytics")
+
+            user_stats = get_user_analytics()
+            history_stats = get_history_analytics()
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.metric("Users", user_stats["total_users"])
+                st.metric("Active", user_stats["active_users"])
+                st.metric("Blocked", user_stats["blocked_users"])
+
+            with c2:
+                st.metric("Queries", history_stats["total_queries"])
+                st.metric("Success", history_stats["successful_queries"])
+                st.metric("Failed", history_stats["failed_queries"])
+
+            st.markdown("### 🏆 Top Users")
+
+            if history_stats["top_users"]:
+                top_users_df = pd.DataFrame(
+                    history_stats["top_users"],
+                    columns=["User Email", "Query Count"]
+                )
+                st.dataframe(top_users_df)
+            else:
+                st.info("No query usage yet.")
+
+            st.markdown("---")
+            st.markdown("### 👥 User Management")
 
             users = get_all_users()
 
@@ -266,7 +352,6 @@ with st.sidebar:
                 )
 
                 if role != "admin":
-
                     if is_active:
                         if st.button(
                             f"Block {email}",
@@ -292,71 +377,97 @@ with st.sidebar:
                 else:
                     st.info("No uploaded data found.")
 
+        with st.expander("📜 All Query History", expanded=False):
+            all_history = get_all_history()
+
+            if all_history:
+                for h in all_history:
+                    user_email, question, sql_query, status, created_at = h
+                    st.markdown(f"**{created_at} | {user_email}**")
+                    st.write(question)
+                    st.code(sql_query, language="sql")
+                    st.caption(status)
+                    st.markdown("---")
+            else:
+                st.info("No query history found.")
+
 
 # =========================================================
-# TOOL 1: TEXT TO SQL
+# DASHBOARD
 # =========================================================
-if st.session_state.selected_tool == "Text-to-SQL":
+if st.session_state.selected_tool == "🏠 Dashboard":
+
+    st.subheader("🏠 Platform Dashboard")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Active Tool", "Text-to-SQL")
+        st.info("Ask questions in natural language and get SQL results.")
+
+    with col2:
+        st.metric("Data Insights", "Available")
+        st.info("Analyze uploaded CSV files and generate charts.")
+
+    with col3:
+        st.metric("Creative Tools", "Coming Soon")
+        st.info("Animal face and bird voice tools are planned.")
+
+    st.markdown("---")
+
+    st.markdown("### Available Tools")
+
+    t1, t2, t3 = st.columns(3)
+
+    with t1:
+        st.markdown("#### 📊 Text-to-SQL")
+        st.write("Query default or uploaded relational CSV data.")
+        if st.button("Open Text-to-SQL"):
+            st.session_state.selected_tool = "📊 Text-to-SQL"
+            st.rerun()
+
+    with t2:
+        st.markdown("#### 📈 AI Data Insights + Charts")
+        st.write("Generate summaries and charts from uploaded CSV files.")
+        if st.button("Open Insights"):
+            st.session_state.selected_tool = "📈 AI Data Insights + Charts"
+            st.rerun()
+
+    with t3:
+        st.markdown("#### 🧪 Future Tools")
+        st.write("Animal Face Transformer and Bird Voice Generator.")
+
+
+# =========================================================
+# TEXT TO SQL
+# =========================================================
+elif st.session_state.selected_tool == "📊 Text-to-SQL":
 
     st.subheader("📊 Text-to-SQL / Chat with Data")
 
-    with st.sidebar:
+    with st.expander("📐 Current Database Schema", expanded=False):
+        current_schema = load_schema() + "\n" + get_uploaded_schema()
+        st.code(current_schema, language="text")
 
-        st.markdown("---")
-        st.subheader("📂 Upload CSV Files")
+    st.markdown("### Suggested Questions")
 
-        uploaded_files = st.file_uploader(
-            "Upload one or more CSV files",
-            type=["csv"],
-            accept_multiple_files=True
-        )
+    samples = [
+        "show all employees",
+        "Where does Mukesh Dabi live?",
+        "Show Mukesh Dabi contact details",
+        "Show all persons with their city",
+        "Which person lives in Bangalore?"
+    ]
 
-        if uploaded_files:
+    cols = st.columns(len(samples))
 
-            for uploaded_file in uploaded_files:
-
-                try:
-                    uploaded_file.seek(0)
-
-                    table_name, columns = save_csv_to_sqlite(uploaded_file)
-
-                    st.success(f"Uploaded: {uploaded_file.name}")
-                    st.write(f"Table: `{table_name}`")
-                    st.write(columns)
-
-                    uploaded_file.seek(0)
-                    df_preview = pd.read_csv(uploaded_file)
-
-                    with st.expander(f"Preview {uploaded_file.name}"):
-                        st.dataframe(df_preview)
-
-                except Exception as e:
-                    st.error(
-                        f"Upload failed for {uploaded_file.name}: {str(e)}"
-                    )
-
-        st.markdown("---")
-
-        st.subheader("📌 Sample Queries")
-
-        samples = [
-            "show all employees",
-            "Where does Mukesh Dabi live?",
-            "Show Mukesh Dabi contact details",
-            "Show all persons with their city",
-            "Which person lives in Bangalore?"
-        ]
-
-        for q in samples:
-            if st.button(q):
+    for i, q in enumerate(samples):
+        with cols[i]:
+            if st.button(q, key=f"sample_{i}"):
                 st.session_state.pending_question = q
                 st.rerun()
 
-        st.markdown("---")
-
-        st.subheader("📐 Database Schema")
-        current_schema = load_schema() + "\n" + get_uploaded_schema()
-        st.code(current_schema, language="text")
+    st.markdown("---")
 
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
@@ -422,10 +533,7 @@ if st.session_state.selected_tool == "Text-to-SQL":
                 columns = result["columns"]
 
                 if rows:
-                    df = pd.DataFrame(
-                        rows,
-                        columns=columns
-                    )
+                    df = pd.DataFrame(rows, columns=columns)
 
                     st.markdown("### 📊 Result")
                     st.write(f"Rows: {len(df)}")
@@ -434,10 +542,15 @@ if st.session_state.selected_tool == "Text-to-SQL":
                 else:
                     st.info("No data found")
 
+        status = "success" if "error" not in result else "error"
+
         save_history(
+            st.session_state.user["id"],
+            st.session_state.user["email"],
             query,
             sql,
-            result
+            answer,
+            status
         )
 
         increment_query_count(st.session_state.user["id"])
@@ -447,16 +560,86 @@ if st.session_state.selected_tool == "Text-to-SQL":
 
 
 # =========================================================
-# TOOL 2: ANIMAL FACE TRANSFORMER
+# AI DATA INSIGHTS + CHARTS
 # =========================================================
-elif st.session_state.selected_tool == "Animal Face Transformer":
+elif st.session_state.selected_tool == "📈 AI Data Insights + Charts":
+
+    st.subheader("📈 AI Data Insights + Charts")
+
+    tables = get_table_names()
+
+    if not tables:
+        st.warning("Please upload one or more CSV files from the sidebar first.")
+        st.stop()
+
+    selected_table = st.selectbox(
+        "Select uploaded table",
+        tables
+    )
+
+    df = load_table_as_df(selected_table)
+
+    st.markdown("### Data Preview")
+    st.dataframe(df.head())
+
+    insights = generate_basic_insights(df)
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("Rows", insights["row_count"])
+
+    with c2:
+        st.metric("Columns", insights["column_count"])
+
+    with c3:
+        st.metric("Missing Values", sum(insights["missing_values"].values()))
+
+    tab_summary, tab_chart = st.tabs(["📋 Summary", "📊 Charts"])
+
+    with tab_summary:
+        st.markdown("### Columns")
+        st.write(insights["columns"])
+
+        st.markdown("### Numeric Columns")
+        st.write(insights["numeric_columns"])
+
+        st.markdown("### Categorical Columns")
+        st.write(insights["categorical_columns"])
+
+        st.markdown("### Missing Values")
+        st.write(insights["missing_values"])
+
+        if insights["numeric_columns"]:
+            st.markdown("### Numeric Summary")
+            st.dataframe(df[insights["numeric_columns"]].describe())
+
+    with tab_chart:
+        if insights["categorical_columns"]:
+            chart_column = st.selectbox(
+                "Select categorical column",
+                insights["categorical_columns"]
+            )
+
+            chart_data = df[chart_column].value_counts()
+
+            st.markdown(f"### Count by {chart_column}")
+            st.bar_chart(chart_data)
+        else:
+            st.info("No categorical column available for chart.")
+
+
+# =========================================================
+# ANIMAL FACE TRANSFORMER
+# =========================================================
+elif st.session_state.selected_tool == "🐯 Animal Face Transformer":
 
     st.subheader("🐯 Animal Face Transformer")
     st.info("Coming soon.")
 
     st.markdown(
         """
-        Future feature:
+        Planned feature:
         - Upload face image
         - Select animal style
         - Generate transformed creative image
@@ -465,16 +648,16 @@ elif st.session_state.selected_tool == "Animal Face Transformer":
 
 
 # =========================================================
-# TOOL 3: BIRD VOICE GENERATOR
+# BIRD VOICE GENERATOR
 # =========================================================
-elif st.session_state.selected_tool == "Bird Voice Generator":
+elif st.session_state.selected_tool == "🐦 Bird Voice Generator":
 
     st.subheader("🐦 Bird Voice Generator")
     st.info("Coming soon.")
 
     st.markdown(
         """
-        Future feature:
+        Planned feature:
         - Type bird name
         - Generate or fetch bird sound
         - Play audio in browser
