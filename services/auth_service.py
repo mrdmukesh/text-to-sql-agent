@@ -142,3 +142,65 @@ def update_user_status(user_id, is_active):
 
     conn.commit()
     conn.close()
+
+def get_or_create_google_user(name, email):
+    conn = get_auth_connection()
+    cursor = conn.cursor()
+
+    email = email.lower()
+
+    cursor.execute("""
+    SELECT id, name, email, role, is_active, query_limit, query_count
+    FROM users
+    WHERE email = ?
+    """, (email,))
+
+    user = cursor.fetchone()
+
+    if user:
+        conn.close()
+
+        if user[4] == 0:
+            return None, "Your account is blocked. Please contact admin."
+
+        return {
+            "id": user[0],
+            "name": user[1],
+            "email": user[2],
+            "role": user[3],
+            "is_active": user[4],
+            "query_limit": user[5],
+            "query_count": user[6]
+        }, "Google login successful."
+
+    role = (
+        "admin"
+        if email in [e.lower() for e in ADMIN_EMAILS]
+        else "user"
+    )
+
+    cursor.execute("""
+    INSERT INTO users (name, email, password_hash, role)
+    VALUES (?, ?, ?, ?)
+    """, (name, email, "GOOGLE_AUTH_USER", role))
+
+    conn.commit()
+
+    cursor.execute("""
+    SELECT id, name, email, role, is_active, query_limit, query_count
+    FROM users
+    WHERE email = ?
+    """, (email,))
+
+    new_user = cursor.fetchone()
+    conn.close()
+
+    return {
+        "id": new_user[0],
+        "name": new_user[1],
+        "email": new_user[2],
+        "role": new_user[3],
+        "is_active": new_user[4],
+        "query_limit": new_user[5],
+        "query_count": new_user[6]
+    }, "Google user created and logged in."

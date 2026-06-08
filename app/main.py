@@ -4,10 +4,13 @@ GenAI Studio Lab - AI Data Analyst with Login, Admin Control and Multi-CSV SQL
 
 import sys
 import os
+import requests
 import streamlit as st
 import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+from streamlit_oauth import OAuth2Component
 
 from backend.sql_generator import generate_sql
 from backend.sql_executor import run_sql
@@ -24,6 +27,7 @@ from services.auth_service import (
     init_auth_db,
     register_user,
     login_user,
+    get_or_create_google_user,
     can_run_query,
     increment_query_count,
     get_all_users,
@@ -39,6 +43,23 @@ st.set_page_config(
     page_title="GenAI Studio Lab",
     page_icon="🧠",
     layout="wide"
+)
+
+
+# ---------------- GOOGLE OAUTH CONFIG ----------------
+AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+REFRESH_TOKEN_URL = "https://oauth2.googleapis.com/token"
+REVOKE_TOKEN_URL = "https://oauth2.googleapis.com/revoke"
+USER_INFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo"
+
+oauth2 = OAuth2Component(
+    st.secrets["GOOGLE_CLIENT_ID"],
+    st.secrets["GOOGLE_CLIENT_SECRET"],
+    AUTHORIZE_URL,
+    TOKEN_URL,
+    REFRESH_TOKEN_URL,
+    REVOKE_TOKEN_URL
 )
 
 
@@ -80,6 +101,50 @@ if st.session_state.user is None:
         tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
 
         with tab_login:
+
+            st.markdown("### Continue with Google")
+
+            result = oauth2.authorize_button(
+                name="Login with Google",
+                redirect_uri=st.secrets["REDIRECT_URI"],
+                scope="openid email profile",
+                key="google_login"
+            )
+
+            if result and "token" in result:
+
+                token = result["token"]
+
+                headers = {
+                    "Authorization": f"Bearer {token['access_token']}"
+                }
+
+                user_info = requests.get(
+                    USER_INFO_URL,
+                    headers=headers,
+                    timeout=10
+                ).json()
+
+                google_name = user_info.get("name", "")
+                google_email = user_info.get("email", "")
+
+                if google_email:
+                    user, msg = get_or_create_google_user(
+                        google_name,
+                        google_email
+                    )
+
+                    if user:
+                        st.session_state.user = user
+                        st.success(msg)
+                        st.rerun()
+                    else:
+                        st.error(msg)
+                else:
+                    st.error("Unable to get email from Google.")
+
+            st.markdown("---")
+            st.markdown("### Or login with email/password")
 
             login_email = st.text_input("Email", key="login_email")
             login_password = st.text_input(
@@ -186,7 +251,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ---------------- ADMIN PANEL ----------------
     if st.session_state.user["role"] == "admin":
 
         with st.expander("🛡️ Admin Panel", expanded=False):
@@ -294,12 +358,10 @@ if st.session_state.selected_tool == "Text-to-SQL":
         current_schema = load_schema() + "\n" + get_uploaded_schema()
         st.code(current_schema, language="text")
 
-    # ---------------- CHAT HISTORY ----------------
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    # ---------------- INPUT ----------------
     query = None
 
     if st.session_state.get("pending_question"):
@@ -311,7 +373,6 @@ if st.session_state.selected_tool == "Text-to-SQL":
     if user_input:
         query = user_input
 
-    # ---------------- PROCESS QUERY ----------------
     if query:
 
         if not can_run_query(st.session_state.user):
@@ -381,7 +442,6 @@ if st.session_state.selected_tool == "Text-to-SQL":
 
         increment_query_count(st.session_state.user["id"])
 
-        # refresh local session count
         if st.session_state.user["role"] != "admin":
             st.session_state.user["query_count"] += 1
 
