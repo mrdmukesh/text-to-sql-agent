@@ -7,7 +7,7 @@ UPLOAD_DB_PATH = os.path.join(BASE_DIR, "uploads", "uploaded_data.db")
 
 
 def get_db_path(query: str):
-    query_lower = query.lower()
+    query_lower = str(query).lower()
 
     if "uploaded_data" in query_lower:
         return UPLOAD_DB_PATH
@@ -17,7 +17,7 @@ def get_db_path(query: str):
 
 def run_sql(query: str):
 
-    query = query.strip()
+    query = str(query).strip()
     db_path = get_db_path(query)
 
     conn = sqlite3.connect(db_path)
