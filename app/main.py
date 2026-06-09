@@ -49,12 +49,18 @@ from services.auth_service import (
     update_user_status,
     get_user_analytics
 )
-
+from services.token_usage_service import (
+    init_usage_db,
+    save_token_usage,
+    get_user_token_usage,
+    get_all_token_usage
+)
 
 # ---------------- INIT ----------------
 init_db()
 init_auth_db()
 init_history_db()
+init_usage_db()
 
 st.set_page_config(
     page_title="GenAI Studio Lab",
@@ -233,7 +239,23 @@ with st.sidebar:
 
     st.success(f"Logged in: {st.session_state.user['email']}")
     st.caption(f"Role: {st.session_state.user['role']}")
+    if st.session_state.user["role"] != "admin":
+        st.caption(
+        f"Used Queries: "
+        f"{st.session_state.user['query_count']}/"
+        f"{st.session_state.user['query_limit']}"
+    )
+    token_stats = get_user_token_usage(
+    st.session_state.user["id"]
+    )
 
+    st.caption(
+        f"Tokens Used: {token_stats['total_tokens']}"
+    )
+
+    st.caption(
+        f"Estimated Cost: ${token_stats['estimated_cost']}"
+    )
     if st.session_state.user["role"] != "admin":
         st.caption(
             f"Usage: {st.session_state.user['query_count']}/"
@@ -311,6 +333,26 @@ with st.sidebar:
         with st.expander("🛡️ Admin Panel", expanded=False):
 
             st.subheader("📊 Analytics")
+            st.markdown("### 💰 Token Usage Analytics")
+
+            usage_rows = get_all_token_usage()
+
+            if usage_rows:
+
+                usage_df = pd.DataFrame(
+                    usage_rows,
+                    columns=[
+                        "User Email",
+                        "API Calls",
+                        "Total Tokens",
+                        "Estimated Cost ($)"
+                    ]
+                )
+
+                st.dataframe(usage_df)
+
+            else:
+                st.info("No token usage found yet.")
 
             user_stats = get_user_analytics()
             history_stats = get_history_analytics()
@@ -498,7 +540,7 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
         with st.chat_message("user"):
             st.write(query)
 
-        sql = generate_sql(query)
+        sql, usage = generate_sql(query)
         sql = sql.strip().replace("```sql", "").replace("```", "").strip()
 
         with st.chat_message("assistant"):
@@ -506,6 +548,12 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
             st.code(sql, language="sql")
 
         result = run_sql(sql)
+        save_token_usage(
+            st.session_state.user["id"],
+            st.session_state.user["email"],
+            "Text-to-SQL",
+            usage
+        )
 
         answer = ""
 

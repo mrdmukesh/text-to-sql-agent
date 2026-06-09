@@ -20,10 +20,7 @@ if api_key:
     client = OpenAI(api_key=api_key)
 
 
-def call_openai(prompt: str):
-
-    if not client:
-        return "MOCK_SQL: SELECT * FROM employees"
+def call_openai(prompt: str, return_usage: bool = False):
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -39,4 +36,15 @@ def call_openai(prompt: str):
         ]
     )
 
-    return response.choices[0].message.content
+    result = response.choices[0].message.content
+
+    usage = {
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "total_tokens": response.usage.total_tokens
+    }
+
+    if return_usage:
+        return result, usage
+
+    return result

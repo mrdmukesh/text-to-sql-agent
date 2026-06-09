@@ -6,47 +6,62 @@ from services.file_upload_service import get_uploaded_schema
 
 def generate_sql(question: str):
 
+    # -----------------------------
+    # LOAD SCHEMAS
+    # -----------------------------
     static_schema = load_schema()
     uploaded_schema = get_uploaded_schema()
 
-    full_schema = f"""
-YOU ARE A STRICT SQLITE SQL GENERATOR.
+    # -----------------------------
+    # PRIORITY LOGIC
+    # -----------------------------
+    if uploaded_schema and uploaded_schema.strip():
+         full_schema = f"""
+        YOU ARE QUERYING A DATABASE SYSTEM WITH TWO DATA SOURCES.
 
-AVAILABLE DATABASE TABLES:
+        DEFAULT DATABASE TABLES:
+        {static_schema}
 
-DEFAULT TABLES:
-{static_schema}
+        USER-UPLOADED DATABASE TABLES:
+        {uploaded_schema}
 
-UPLOADED TABLES:
-{uploaded_schema}
+        IMPORTANT RULES:
+        - Use employees table for employee-related questions.
+        - Use uploaded tables for uploaded CSV related questions.
+        - ONLY use tables present in the schemas above.
+        - Use proper JOINs when relationships exist.
+        - Generate only valid SQLite SELECT SQL.
+        - Return only SQL query.
+        """
+    else:
+          full_schema = f"""
+            YOU ARE QUERYING A STATIC DATABASE.
 
-IMPORTANT RULES:
-1. Use ONLY available tables.
-2. employees table belongs to default database.
-3. uploaded tables belong to uploaded database.
-4. Return ONLY SELECT SQL.
-5. Never explain anything.
-6. Use JOIN when relationships exist.
-7. Use LOWER(column)=LOWER(value) for text matching.
-
-RELATIONSHIP EXAMPLES:
-persons.person_id = addresses.person_id
-persons.person_id = contacts.person_id
+            DATABASE SCHEMA:
+            {static_schema}
 """
 
+    # -----------------------------
+    # BUILD PROMPT
+    # -----------------------------
     prompt = SQL_PROMPT.format(
         schema=full_schema,
         question=question
     )
 
-    sql = call_openai(prompt)
+    # -----------------------------
+    # CALL OPENAI
+    # -----------------------------
+    sql, usage = call_openai(
+        prompt,
+        return_usage=True
+    )
 
     sql = (
-        sql
-        .strip()
+        sql.strip()
         .replace("```sql", "")
         .replace("```", "")
         .strip()
     )
 
-    return sql
+    return sql, usage
