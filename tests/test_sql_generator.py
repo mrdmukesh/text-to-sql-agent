@@ -5,7 +5,8 @@ def test_sql_generation_basic():
 
     question = "show all employees"
 
-    sql = generate_sql(question)
+    sql, usage = generate_sql(question)
 
     assert "SELECT" in sql.upper()
+    assert isinstance(usage, dict)
     assert "employees" in sql.lower()

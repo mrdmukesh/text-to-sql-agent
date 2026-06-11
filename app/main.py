@@ -18,24 +18,16 @@ from backend.result_explainer import explain_result
 from data.database import init_db
 from backend.schema_loader import load_schema
 
-from services.file_upload_service import (
-    save_csv_to_sqlite,
-    get_uploaded_schema,
-    UPLOAD_DB
-)
-
-from services.insight_service import (
-    get_table_names,
-    load_table_as_df,
-    generate_basic_insights
-)
+from services.file_upload_service import save_csv_to_sqlite, get_uploaded_schema, UPLOAD_DB
+from services.insight_service import get_table_names, load_table_as_df, generate_basic_insights
+from services.receipt_ai_service import extract_receipt_details
 
 from services.history_service import (
     init_history_db,
     save_history,
     get_user_history,
     get_all_history,
-    get_history_analytics
+    get_history_analytics,
 )
 
 from services.auth_service import (
@@ -47,29 +39,44 @@ from services.auth_service import (
     increment_query_count,
     get_all_users,
     update_user_status,
-    get_user_analytics
+    get_user_analytics,
 )
+
 from services.token_usage_service import (
     init_usage_db,
     save_token_usage,
     get_user_token_usage,
-    get_all_token_usage
+    get_all_token_usage,
 )
 
-# ---------------- INIT ----------------
+from services.claim_service import (
+    init_claim_db,
+    save_claim,
+    get_user_claims,
+    get_all_claims,
+    update_claim_status,
+)
+
+
+# =========================================================
+# INIT
+# =========================================================
 init_db()
 init_auth_db()
 init_history_db()
 init_usage_db()
+init_claim_db()
 
 st.set_page_config(
     page_title="GenAI Studio Lab",
     page_icon="🧠",
-    layout="wide"
+    layout="wide",
 )
 
 
-# ---------------- GOOGLE OAUTH CONFIG ----------------
+# =========================================================
+# GOOGLE OAUTH CONFIG
+# =========================================================
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REFRESH_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -82,11 +89,13 @@ oauth2 = OAuth2Component(
     AUTHORIZE_URL,
     TOKEN_URL,
     REFRESH_TOKEN_URL,
-    REVOKE_TOKEN_URL
+    REVOKE_TOKEN_URL,
 )
 
 
-# ---------------- SESSION STATE ----------------
+# =========================================================
+# SESSION STATE
+# =========================================================
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
@@ -114,24 +123,22 @@ if st.session_state.user is None:
         Secure AI tools for data analysis, automation and creativity.
         </p>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-
         tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
 
         with tab_login:
-
             st.markdown("### Continue with Google")
 
             result = oauth2.authorize_button(
                 name="Login with Google",
                 redirect_uri=st.secrets["REDIRECT_URI"],
                 scope="openid email profile",
-                key="google_login"
+                key="google_login",
             )
 
             if result and "token" in result:
@@ -144,7 +151,7 @@ if st.session_state.user is None:
                 user_info = requests.get(
                     USER_INFO_URL,
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 ).json()
 
                 google_name = user_info.get("name", "")
@@ -153,7 +160,7 @@ if st.session_state.user is None:
                 if google_email:
                     user, msg = get_or_create_google_user(
                         google_name,
-                        google_email
+                        google_email,
                     )
 
                     if user:
@@ -172,7 +179,7 @@ if st.session_state.user is None:
             login_password = st.text_input(
                 "Password",
                 type="password",
-                key="login_password"
+                key="login_password",
             )
 
             if st.button("Login", use_container_width=True):
@@ -186,13 +193,12 @@ if st.session_state.user is None:
                     st.error(msg)
 
         with tab_register:
-
             reg_name = st.text_input("Name", key="reg_name")
             reg_email = st.text_input("Email", key="reg_email")
             reg_password = st.text_input(
                 "Password",
                 type="password",
-                key="reg_password"
+                key="reg_password",
             )
 
             if st.button("Register", use_container_width=True):
@@ -202,7 +208,7 @@ if st.session_state.user is None:
                     success, msg = register_user(
                         reg_name,
                         reg_email,
-                        reg_password
+                        reg_password,
                     )
 
                     if success:
@@ -223,44 +229,35 @@ st.markdown(
     🧠 GenAI Studio Lab
     </h1>
     <p style='text-align: center; font-size: 16px;'>
-    AI-powered data analysis, SQL intelligence and future creative tools.
+    AI-powered data analysis, SQL intelligence, receipt claim automation and future creative tools.
     </p>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
 # =========================================================
-# SIDEBAR
+# SIDEBAR - USER INFO, NAVIGATION, UPLOAD, ADMIN
 # =========================================================
 with st.sidebar:
 
     st.title("🧭 Control Panel")
 
+    # ---------------- USER INFO ----------------
     st.success(f"Logged in: {st.session_state.user['email']}")
     st.caption(f"Role: {st.session_state.user['role']}")
+
     if st.session_state.user["role"] != "admin":
         st.caption(
-        f"Used Queries: "
-        f"{st.session_state.user['query_count']}/"
-        f"{st.session_state.user['query_limit']}"
-    )
-    token_stats = get_user_token_usage(
-    st.session_state.user["id"]
-    )
-
-    st.caption(
-        f"Tokens Used: {token_stats['total_tokens']}"
-    )
-
-    st.caption(
-        f"Estimated Cost: ${token_stats['estimated_cost']}"
-    )
-    if st.session_state.user["role"] != "admin":
-        st.caption(
-            f"Usage: {st.session_state.user['query_count']}/"
+            f"Used Queries: "
+            f"{st.session_state.user['query_count']}/"
             f"{st.session_state.user['query_limit']}"
         )
+
+    token_stats = get_user_token_usage(st.session_state.user["id"])
+
+    st.caption(f"Tokens Used: {token_stats['total_tokens']}")
+    st.caption(f"Estimated Cost: ${token_stats['estimated_cost']}")
 
     if st.button("Logout"):
         st.session_state.user = None
@@ -269,27 +266,30 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # ---------------- TOOL NAVIGATION ----------------
     selected_tool = st.radio(
         "🚀 Select Tool",
         [
             "🏠 Dashboard",
             "📊 Text-to-SQL",
             "📈 AI Data Insights + Charts",
+            "🧾 Receipt Claim Assistant",
             "🐯 Animal Face Transformer",
-            "🐦 Bird Voice Generator"
-        ]
+            "🐦 Bird Voice Generator",
+        ],
     )
 
     st.session_state.selected_tool = selected_tool
 
     st.markdown("---")
 
+    # ---------------- GLOBAL CSV UPLOAD ----------------
     st.subheader("📂 Data Upload")
 
     uploaded_files = st.file_uploader(
         "Upload CSV files",
         type=["csv"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
     )
 
     if uploaded_files:
@@ -314,6 +314,7 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # ---------------- USER QUERY HISTORY ----------------
     with st.expander("🕘 My Recent Queries", expanded=False):
         history_rows = get_user_history(st.session_state.user["id"])
 
@@ -328,31 +329,13 @@ with st.sidebar:
         else:
             st.info("No history yet.")
 
+    # ---------------- ADMIN PANEL ----------------
     if st.session_state.user["role"] == "admin":
 
         with st.expander("🛡️ Admin Panel", expanded=False):
 
-            st.subheader("📊 Analytics")
-            st.markdown("### 💰 Token Usage Analytics")
-
-            usage_rows = get_all_token_usage()
-
-            if usage_rows:
-
-                usage_df = pd.DataFrame(
-                    usage_rows,
-                    columns=[
-                        "User Email",
-                        "API Calls",
-                        "Total Tokens",
-                        "Estimated Cost ($)"
-                    ]
-                )
-
-                st.dataframe(usage_df)
-
-            else:
-                st.info("No token usage found yet.")
+            # ---------- ADMIN ANALYTICS ----------
+            st.subheader("📊 Admin Analytics")
 
             user_stats = get_user_analytics()
             history_stats = get_history_analytics()
@@ -369,18 +352,95 @@ with st.sidebar:
                 st.metric("Success", history_stats["successful_queries"])
                 st.metric("Failed", history_stats["failed_queries"])
 
+            st.markdown("---")
+
+            # ---------- TOKEN USAGE ANALYTICS ----------
+            st.markdown("### 💰 Token Usage Analytics")
+
+            usage_rows = get_all_token_usage()
+
+            if usage_rows:
+                usage_df = pd.DataFrame(
+                    usage_rows,
+                    columns=[
+                        "User Email",
+                        "API Calls",
+                        "Total Tokens",
+                        "Estimated Cost ($)",
+                    ],
+                )
+
+                st.dataframe(usage_df)
+            else:
+                st.info("No token usage found yet.")
+
+            st.markdown("---")
+
+            # ---------- TOP USERS ----------
             st.markdown("### 🏆 Top Users")
 
             if history_stats["top_users"]:
                 top_users_df = pd.DataFrame(
                     history_stats["top_users"],
-                    columns=["User Email", "Query Count"]
+                    columns=["User Email", "Query Count"],
                 )
                 st.dataframe(top_users_df)
             else:
                 st.info("No query usage yet.")
 
             st.markdown("---")
+
+            # ---------- CLAIM REVIEW ----------
+            st.markdown("### 🧾 Claim Review")
+
+            claims = get_all_claims()
+
+            if claims:
+                claims_df = pd.DataFrame(
+                    claims,
+                    columns=[
+                        "Claim ID",
+                        "User Email",
+                        "Vendor",
+                        "Date",
+                        "Amount",
+                        "Currency",
+                        "Category",
+                        "Status",
+                        "Created At",
+                    ],
+                )
+
+                st.dataframe(claims_df)
+
+                claim_id = st.number_input(
+                    "Claim ID",
+                    min_value=1,
+                    step=1,
+                    key="admin_claim_id",
+                )
+
+                new_status = st.selectbox(
+                    "Update Claim Status",
+                    [
+                        "Submitted",
+                        "Approved",
+                        "Rejected",
+                        "Need Clarification",
+                    ],
+                    key="admin_claim_status",
+                )
+
+                if st.button("Update Claim Status"):
+                    update_claim_status(claim_id, new_status)
+                    st.success("Claim status updated.")
+                    st.rerun()
+            else:
+                st.info("No claims available.")
+
+            st.markdown("---")
+
+            # ---------- USER MANAGEMENT ----------
             st.markdown("### 👥 User Management")
 
             users = get_all_users()
@@ -397,20 +457,21 @@ with st.sidebar:
                     if is_active:
                         if st.button(
                             f"Block {email}",
-                            key=f"block_{user_id}"
+                            key=f"block_{user_id}",
                         ):
                             update_user_status(user_id, 0)
                             st.rerun()
                     else:
                         if st.button(
                             f"Activate {email}",
-                            key=f"activate_{user_id}"
+                            key=f"activate_{user_id}",
                         ):
                             update_user_status(user_id, 1)
                             st.rerun()
 
             st.markdown("---")
 
+            # ---------- DATA ADMIN ----------
             if st.button("🗑️ Clear Uploaded Data"):
                 if os.path.exists(UPLOAD_DB):
                     os.remove(UPLOAD_DB)
@@ -419,6 +480,7 @@ with st.sidebar:
                 else:
                     st.info("No uploaded data found.")
 
+        # ---------- ALL QUERY HISTORY ----------
         with st.expander("📜 All Query History", expanded=False):
             all_history = get_all_history()
 
@@ -435,7 +497,7 @@ with st.sidebar:
 
 
 # =========================================================
-# DASHBOARD
+# TOOL: DASHBOARD
 # =========================================================
 if st.session_state.selected_tool == "🏠 Dashboard":
 
@@ -444,16 +506,16 @@ if st.session_state.selected_tool == "🏠 Dashboard":
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("Active Tool", "Text-to-SQL")
-        st.info("Ask questions in natural language and get SQL results.")
+        st.metric("Text-to-SQL", "Active")
+        st.info("Ask natural language questions and get SQL results.")
 
     with col2:
-        st.metric("Data Insights", "Available")
+        st.metric("Data Insights", "Active")
         st.info("Analyze uploaded CSV files and generate charts.")
 
     with col3:
-        st.metric("Creative Tools", "Coming Soon")
-        st.info("Animal face and bird voice tools are planned.")
+        st.metric("Receipt Claims", "Active")
+        st.info("Extract claim details from receipt images.")
 
     st.markdown("---")
 
@@ -476,12 +538,15 @@ if st.session_state.selected_tool == "🏠 Dashboard":
             st.rerun()
 
     with t3:
-        st.markdown("#### 🧪 Future Tools")
-        st.write("Animal Face Transformer and Bird Voice Generator.")
+        st.markdown("#### 🧾 Receipt Claim Assistant")
+        st.write("Upload receipts and auto-fill reimbursement forms.")
+        if st.button("Open Receipt Claims"):
+            st.session_state.selected_tool = "🧾 Receipt Claim Assistant"
+            st.rerun()
 
 
 # =========================================================
-# TEXT TO SQL
+# TOOL: TEXT TO SQL
 # =========================================================
 elif st.session_state.selected_tool == "📊 Text-to-SQL":
 
@@ -498,7 +563,7 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
         "Where does Mukesh Dabi live?",
         "Show Mukesh Dabi contact details",
         "Show all persons with their city",
-        "Which person lives in Bangalore?"
+        "Which person lives in Bangalore?",
     ]
 
     cols = st.columns(len(samples))
@@ -532,10 +597,12 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
             st.error("Query limit reached. Please contact admin.")
             st.stop()
 
-        st.session_state.chat.append({
-            "role": "user",
-            "content": query
-        })
+        st.session_state.chat.append(
+            {
+                "role": "user",
+                "content": query,
+            }
+        )
 
         with st.chat_message("user"):
             st.write(query)
@@ -548,11 +615,12 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
             st.code(sql, language="sql")
 
         result = run_sql(sql)
+
         save_token_usage(
             st.session_state.user["id"],
             st.session_state.user["email"],
             "Text-to-SQL",
-            usage
+            usage,
         )
 
         answer = ""
@@ -562,7 +630,7 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
                 answer = explain_result(
                     query,
                     sql,
-                    result["rows"]
+                    result["rows"],
                 )
             except Exception as e:
                 answer = f"Unable to generate explanation: {str(e)}"
@@ -598,7 +666,7 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
             query,
             sql,
             answer,
-            status
+            status,
         )
 
         increment_query_count(st.session_state.user["id"])
@@ -608,7 +676,7 @@ elif st.session_state.selected_tool == "📊 Text-to-SQL":
 
 
 # =========================================================
-# AI DATA INSIGHTS + CHARTS
+# TOOL: AI DATA INSIGHTS + CHARTS
 # =========================================================
 elif st.session_state.selected_tool == "📈 AI Data Insights + Charts":
 
@@ -622,7 +690,7 @@ elif st.session_state.selected_tool == "📈 AI Data Insights + Charts":
 
     selected_table = st.selectbox(
         "Select uploaded table",
-        tables
+        tables,
     )
 
     df = load_table_as_df(selected_table)
@@ -666,7 +734,7 @@ elif st.session_state.selected_tool == "📈 AI Data Insights + Charts":
         if insights["categorical_columns"]:
             chart_column = st.selectbox(
                 "Select categorical column",
-                insights["categorical_columns"]
+                insights["categorical_columns"],
             )
 
             chart_data = df[chart_column].value_counts()
@@ -678,7 +746,142 @@ elif st.session_state.selected_tool == "📈 AI Data Insights + Charts":
 
 
 # =========================================================
-# ANIMAL FACE TRANSFORMER
+# TOOL: RECEIPT CLAIM ASSISTANT
+# =========================================================
+elif st.session_state.selected_tool == "🧾 Receipt Claim Assistant":
+
+    st.subheader("🧾 Receipt Claim Assistant")
+
+    st.info(
+        "Upload a receipt or bill image. AI will extract claim details and prepare a reimbursement form."
+    )
+
+    receipt_file = st.file_uploader(
+        "Upload receipt image",
+        type=["png", "jpg", "jpeg"],
+        key="receipt_upload",
+    )
+
+    if receipt_file:
+        st.image(
+            receipt_file,
+            caption="Uploaded Receipt",
+            use_container_width=True,
+        )
+
+        if st.button("Extract Claim Details"):
+            with st.spinner("Reading receipt and extracting claim details..."):
+                extracted = extract_receipt_details(receipt_file)
+
+            st.session_state.extracted_claim = extracted
+
+    if "extracted_claim" in st.session_state:
+
+        claim = st.session_state.extracted_claim
+
+        st.markdown("### Review Claim Form")
+
+        vendor_name = st.text_input("Vendor Name", claim.get("vendor_name", ""))
+        receipt_date = st.text_input("Receipt Date", claim.get("receipt_date", ""))
+        amount = st.text_input("Amount", str(claim.get("amount", "")))
+        currency = st.text_input("Currency", claim.get("currency", ""))
+        tax_amount = st.text_input("Tax Amount", str(claim.get("tax_amount", "")))
+
+        category_options = [
+            "Visa",
+            "Travel",
+            "Food",
+            "Hotel",
+            "Transport",
+            "Office",
+            "Medical",
+            "Other",
+        ]
+
+        extracted_category = claim.get("category", "Other")
+
+        if extracted_category not in category_options:
+            extracted_category = "Other"
+
+        category = st.selectbox(
+            "Category",
+            category_options,
+            index=category_options.index(extracted_category),
+        )
+
+        payment_method = st.text_input(
+            "Payment Method",
+            claim.get("payment_method", ""),
+        )
+
+        invoice_number = st.text_input(
+            "Invoice / Receipt Number",
+            claim.get("invoice_number", ""),
+        )
+
+        description = st.text_area(
+            "Description",
+            claim.get("description", ""),
+        )
+
+        confidence_score = st.text_input(
+            "AI Confidence Score",
+            str(claim.get("confidence_score", "")),
+        )
+
+        final_claim = {
+            "vendor_name": vendor_name,
+            "receipt_date": receipt_date,
+            "amount": amount,
+            "currency": currency,
+            "tax_amount": tax_amount,
+            "category": category,
+            "payment_method": payment_method,
+            "invoice_number": invoice_number,
+            "description": description,
+            "confidence_score": confidence_score,
+            "status": "Submitted",
+        }
+
+        if st.button("Submit Claim"):
+
+            save_claim(
+                st.session_state.user["id"],
+                st.session_state.user["email"],
+                final_claim,
+            )
+
+            st.success("Claim submitted successfully.")
+            del st.session_state.extracted_claim
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### My Claims")
+
+    claims = get_user_claims(st.session_state.user["id"])
+
+    if claims:
+        claims_df = pd.DataFrame(
+            claims,
+            columns=[
+                "Claim ID",
+                "Vendor",
+                "Date",
+                "Amount",
+                "Currency",
+                "Category",
+                "Status",
+                "Created At",
+            ],
+        )
+
+        st.dataframe(claims_df)
+    else:
+        st.info("No claims submitted yet.")
+
+
+# =========================================================
+# TOOL: ANIMAL FACE TRANSFORMER
 # =========================================================
 elif st.session_state.selected_tool == "🐯 Animal Face Transformer":
 
@@ -696,7 +899,7 @@ elif st.session_state.selected_tool == "🐯 Animal Face Transformer":
 
 
 # =========================================================
-# BIRD VOICE GENERATOR
+# TOOL: BIRD VOICE GENERATOR
 # =========================================================
 elif st.session_state.selected_tool == "🐦 Bird Voice Generator":
 
