@@ -54,7 +54,7 @@ def render_sidebar():
 
         selected_tool = st.radio(
             "🚀 Select Tool",
-            [
+            
                [
                     "🏠 Dashboard",
                     "📊 Text-to-SQL",
@@ -63,7 +63,7 @@ def render_sidebar():
                     "🐯 Animal Face Transformer",
                     "🐦 Bird Voice Generator"
                 ]
-            ]
+            
         )
 
         st.markdown("---")
