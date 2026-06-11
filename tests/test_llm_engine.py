@@ -1,30 +1,22 @@
+from unittest.mock import patch, MagicMock
 from backend.llm_engine import call_openai
 
 
-#def test_openai_response():
+def test_openai_response_mock():
 
- #   result = call_openai("Return SQL: show employees")
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "SELECT * FROM employees;"
+    mock_response.usage.prompt_tokens = 10
+    mock_response.usage.completion_tokens = 5
+    mock_response.usage.total_tokens = 15
 
-   # assert result is not None
-    #assert len(result) > 0
+    with patch("backend.llm_engine.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_response
 
+        result, usage = call_openai(
+            "show all employees",
+            return_usage=True
+        )
 
-def mock_llm(prompt):
-    return "SELECT * FROM employees"
-
-def test_openai_response_mock(monkeypatch):
-
-    # Fake response function
-    def mock_openai(prompt):
-        return "SELECT * FROM employees"
-
-    # Replace real API call with mock
-    monkeypatch.setattr(
-        "backend.llm_engine.call_openai",
-        mock_openai
-    )
-
-    result = call_openai("show employees")
-
-    assert "SELECT" in result
-    assert "employees" in result
+    assert result == "SELECT * FROM employees;"
+    assert usage["total_tokens"] == 15

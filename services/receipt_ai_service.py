@@ -83,10 +83,16 @@ Rules:
 
     content = response.choices[0].message.content
 
+    usage = {
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "total_tokens": response.usage.total_tokens,
+    }
+
     try:
-        return json.loads(content)
+        extracted_data = json.loads(content)
     except Exception:
-        return {
+        extracted_data = {
             "vendor_name": "",
             "receipt_date": "",
             "amount": "",
@@ -98,3 +104,5 @@ Rules:
             "description": content,
             "confidence_score": 0,
         }
+
+    return extracted_data, usage

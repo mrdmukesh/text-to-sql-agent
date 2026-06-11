@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-
+from services.token_usage_service import save_token_usage
 from services.receipt_ai_service import extract_receipt_details
 from services.claim_service import (
     save_claim,
@@ -31,7 +31,13 @@ def render_receipt_claim():
 
         if st.button("Extract Claim Details"):
             with st.spinner("Reading receipt and extracting claim details..."):
-                extracted = extract_receipt_details(receipt_file)
+                extracted,usage  = extract_receipt_details(receipt_file)
+                save_token_usage(
+                    st.session_state.user["id"],
+                    st.session_state.user["email"],
+                    "Receipt Claim Assistant",
+                    usage
+                )
 
             st.session_state.extracted_claim = extracted
 
