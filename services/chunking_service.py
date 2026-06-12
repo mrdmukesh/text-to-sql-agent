@@ -2,30 +2,35 @@ import re
 from collections import Counter
 
 
-def fixed_size_chunking(text, chunk_size=300):
-    return [
-        text[i:i + chunk_size].strip()
-        for i in range(0, len(text), chunk_size)
-        if text[i:i + chunk_size].strip()
-    ]
+def fixed_size_chunking(text, chunk_size=300, min_chunk_size=50):
+    chunks = []
+
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i:i + chunk_size].strip()
+
+        if len(chunk) >= min_chunk_size:
+            chunks.append(chunk)
+
+    return chunks
 
 
-def overlap_chunking(text, chunk_size=300, overlap=80):
+def overlap_chunking(text, chunk_size=300, overlap=80, min_chunk_size=50):
     chunks = []
     start = 0
+
+    if overlap >= chunk_size:
+        overlap = int(chunk_size * 0.2)
 
     while start < len(text):
         end = start + chunk_size
         chunk = text[start:end].strip()
 
-        if chunk:
+        if len(chunk) >= min_chunk_size:
             chunks.append(chunk)
 
         start += max(chunk_size - overlap, 1)
 
     return chunks
-
-
 def paragraph_chunking(text):
     return [
         p.strip()

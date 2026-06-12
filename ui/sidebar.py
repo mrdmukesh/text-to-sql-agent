@@ -60,6 +60,7 @@ def render_sidebar():
                     "📊 Text-to-SQL",
                     "📈 AI Data Insights + Charts",
                     "🧩 RAG Chunking Strategy Lab",
+                    "🤖 Enterprise RAG Assistant",
                     "🧾 Receipt Claim Assistant",
                     "🐯 Animal Face Transformer",
                     "🐦 Bird Voice Generator"

@@ -7,7 +7,7 @@ from streamlit_oauth import OAuth2Component
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from data.database import init_db
-
+from ui.pages.animal_transform_page import render_animal_transform
 from services.auth_service import init_auth_db
 from services.history_service import init_history_db
 from services.token_usage_service import init_usage_db
@@ -23,6 +23,7 @@ from ui.pages.insights_page import render_insights
 from ui.pages.receipt_claim_page import render_receipt_claim
 from ui.pages.chunking_page import render_chunking_lab
 from ui.pages.coming_soon import render_coming_soon
+from ui.pages.rag_assistant_page import render_rag_assistant
 
 # =========================================================
 # INIT
@@ -123,18 +124,14 @@ elif selected_tool == "📈 AI Data Insights + Charts":
 elif selected_tool == "🧩 RAG Chunking Strategy Lab":
     render_chunking_lab()
 
+elif selected_tool == "🤖 Enterprise RAG Assistant":
+    render_rag_assistant()
+
 elif selected_tool == "🧾 Receipt Claim Assistant":
     render_receipt_claim()
 
 elif selected_tool == "🐯 Animal Face Transformer":
-    render_coming_soon(
-        "🐯 Animal Face Transformer",
-        [
-            "Upload face image",
-            "Select animal style",
-            "Generate transformed creative image"
-        ]
-    )
+    render_animal_transform()
 
 elif selected_tool == "🐦 Bird Voice Generator":
     render_coming_soon(
