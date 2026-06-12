@@ -29,9 +29,12 @@ def render_login_page(oauth2, user_info_url):
 
         st.markdown("### Platform Capabilities")
         st.info("📊 Text-to-SQL over default and uploaded relational CSV data")
-        st.info("📈 AI data insights, summaries and charts")
+        st.info("📈 AI data insights, summaries and charts from CSV files")
         st.info("🧾 Receipt claim extraction using multimodal AI")
-        st.info("🛡️ Admin control, user limits, token usage and analytics")
+        st.info("🧩 RAG chunking strategy lab for document retrieval simulation")
+        st.info("🔐 Google OAuth login with role-based access control")
+        st.info("💰 Token usage monitoring and admin analytics")
+        st.info("🛡️ Admin control for users, limits, claims and governance")
 
     with right:
         st.markdown("## Welcome back")
@@ -135,3 +138,40 @@ def render_login_page(oauth2, user_info_url):
         """,
         unsafe_allow_html=True
     )
+
+    st.markdown("---")
+
+with st.expander("🔒 Privacy & Data Usage"):
+
+    st.markdown("""
+    ### Privacy Notice
+
+    This application uses AI services to provide features such as:
+    - Text-to-SQL generation
+    - Receipt claim extraction
+    - RAG chunking simulation
+
+    #### Data Handling
+    - Uploaded files and questions are processed only for application functionality.
+    - Some AI-powered features send prompts or uploaded content to OpenAI API for processing.
+    - Uploaded data is not publicly shared with other users.
+    - User history, token usage, and claims are isolated per user account.
+
+    #### Admin Visibility
+    - Application administrators may access analytics, token usage, and submitted claims for support and governance purposes.
+
+    #### Storage
+    - Data is currently stored in SQLite databases used by the application:
+        - auth.db
+        - history.db
+        - usage.db
+        - claims.db
+
+    #### Recommendation
+    Please avoid uploading:
+    - passwords
+    - confidential company secrets
+    - highly sensitive personal information
+
+    By using this application, you acknowledge and accept this data usage behavior.
+    """)

@@ -1,25 +1,28 @@
 import sys
 import os
+
 import streamlit as st
+from streamlit_oauth import OAuth2Component
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from streamlit_oauth import OAuth2Component
-from ui.pages.receipt_claim_page import render_receipt_claim
-from services.claim_service import init_claim_db
 from data.database import init_db
+
 from services.auth_service import init_auth_db
 from services.history_service import init_history_db
 from services.token_usage_service import init_usage_db
+from services.claim_service import init_claim_db
 
 from ui.styles import apply_styles
 from ui.auth_page import render_login_page
 from ui.sidebar import render_sidebar
+
 from ui.pages.dashboard import render_dashboard
 from ui.pages.text_to_sql_page import render_text_to_sql
 from ui.pages.insights_page import render_insights
+from ui.pages.receipt_claim_page import render_receipt_claim
+from ui.pages.chunking_page import render_chunking_lab
 from ui.pages.coming_soon import render_coming_soon
-
 
 # =========================================================
 # INIT
@@ -115,7 +118,10 @@ elif selected_tool == "📊 Text-to-SQL":
     render_text_to_sql()
 
 elif selected_tool == "📈 AI Data Insights + Charts":
-    render_insights()\
+    render_insights()
+
+elif selected_tool == "🧩 RAG Chunking Strategy Lab":
+    render_chunking_lab()
 
 elif selected_tool == "🧾 Receipt Claim Assistant":
     render_receipt_claim()

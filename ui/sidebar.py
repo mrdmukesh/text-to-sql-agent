@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import streamlit as st
-
+from ui.pages.chunking_page import render_chunking_lab
 from services.file_upload_service import (
     save_csv_to_sqlite,
     UPLOAD_DB
@@ -59,6 +59,7 @@ def render_sidebar():
                     "🏠 Dashboard",
                     "📊 Text-to-SQL",
                     "📈 AI Data Insights + Charts",
+                    "🧩 RAG Chunking Strategy Lab",
                     "🧾 Receipt Claim Assistant",
                     "🐯 Animal Face Transformer",
                     "🐦 Bird Voice Generator"
