@@ -3,6 +3,9 @@ import os
 
 import streamlit as st
 from streamlit_oauth import OAuth2Component
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -24,6 +27,22 @@ from ui.pages.receipt_claim_page import render_receipt_claim
 from ui.pages.chunking_page import render_chunking_lab
 from ui.pages.coming_soon import render_coming_soon
 from ui.pages.rag_assistant_page import render_rag_assistant
+
+
+# =========================================================
+# HELPER: ENV FIRST, STREAMLIT SECRETS FALLBACK
+# =========================================================
+def get_config_value(key):
+    value = os.getenv(key)
+
+    if value:
+        return value
+
+    try:
+        return st.secrets[key]
+    except Exception:
+        return None
+
 
 # =========================================================
 # INIT
@@ -52,9 +71,19 @@ REFRESH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_TOKEN_URL = "https://oauth2.googleapis.com/revoke"
 USER_INFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo"
 
+GOOGLE_CLIENT_ID = get_config_value("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = get_config_value("GOOGLE_CLIENT_SECRET")
+
+if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    st.error(
+        "Google OAuth credentials are missing. "
+        "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env, Docker env, Azure App Settings, or Streamlit secrets."
+    )
+    st.stop()
+
 oauth2 = OAuth2Component(
-    st.secrets["GOOGLE_CLIENT_ID"],
-    st.secrets["GOOGLE_CLIENT_SECRET"],
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
     AUTHORIZE_URL,
     TOKEN_URL,
     REFRESH_TOKEN_URL,

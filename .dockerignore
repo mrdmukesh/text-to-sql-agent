@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Git
+.git/
+.gitignore
+
+# Environment variables
+.env
+
+# Logs
+logs/
+
+# Streamlit local config
+.streamlit/
+
+# OS files
+.DS_Store
+
+# Tests
+tests/
+
+# Database temp files
+*.db-journal

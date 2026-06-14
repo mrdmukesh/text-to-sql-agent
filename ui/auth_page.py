@@ -1,3 +1,5 @@
+import os
+
 import requests
 import streamlit as st
 
@@ -47,7 +49,7 @@ def render_login_page(oauth2, user_info_url):
 
             result = oauth2.authorize_button(
                 name="Login with Google",
-                redirect_uri=st.secrets["REDIRECT_URI"],
+                redirect_uri=os.getenv("REDIRECT_URI") or st.secrets.get("REDIRECT_URI"),
                 scope="openid email profile",
                 key="google_login"
             )
