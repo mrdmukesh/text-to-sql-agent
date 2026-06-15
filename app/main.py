@@ -27,7 +27,7 @@ from ui.pages.receipt_claim_page import render_receipt_claim
 from ui.pages.chunking_page import render_chunking_lab
 from ui.pages.coming_soon import render_coming_soon
 from ui.pages.rag_assistant_page import render_rag_assistant
-
+from ui.pages.azure_sql_text_to_sql_page import render_azure_sql_text_to_sql
 
 # =========================================================
 # HELPER: ENV FIRST, STREAMLIT SECRETS FALLBACK
@@ -146,6 +146,9 @@ if selected_tool == "🏠 Dashboard":
 
 elif selected_tool == "📊 Text-to-SQL":
     render_text_to_sql()
+
+elif selected_tool == "☁️ Azure SQL Text-to-SQL":
+    render_azure_sql_text_to_sql()
 
 elif selected_tool == "📈 AI Data Insights + Charts":
     render_insights()

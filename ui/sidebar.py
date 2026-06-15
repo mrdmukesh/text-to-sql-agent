@@ -59,6 +59,7 @@ def render_sidebar():
                     "🏠 Dashboard",
                     "📊 Text-to-SQL",
                     "📈 AI Data Insights + Charts",
+                    "☁️ Azure SQL Text-to-SQL",
                     "🧩 RAG Chunking Strategy Lab",
                     "🤖 Enterprise RAG Assistant",
                     "🧾 Receipt Claim Assistant",
