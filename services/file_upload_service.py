@@ -3,17 +3,21 @@ import re
 import sqlite3
 import pandas as pd
 
+from langsmith import traceable
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 UPLOAD_DB = os.path.join(UPLOADS_DIR, "uploaded_data.db")
 
 
+@traceable(name="Clean Table Name")
 def clean_table_name(filename: str):
     name = os.path.splitext(os.path.basename(filename))[0]
     name = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     return name.lower()
 
 
+@traceable(name="Save CSV To SQLite")
 def save_csv_to_sqlite(uploaded_file):
 
     os.makedirs(UPLOADS_DIR, exist_ok=True)
@@ -37,6 +41,7 @@ def save_csv_to_sqlite(uploaded_file):
     return table_name, list(df.columns)
 
 
+@traceable(name="Get Uploaded Schema")
 def get_uploaded_schema():
 
     if not os.path.exists(UPLOAD_DB):

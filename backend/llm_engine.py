@@ -2,17 +2,24 @@ import os
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
+from langsmith import traceable
 
 load_dotenv()
 
-api_key = None
 
-try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except Exception:
-    api_key = os.getenv("OPENAI_API_KEY")
+def get_config_value(key):
+    value = os.getenv(key)
 
-api_key = os.getenv("OPENAI_API_KEY")
+    if value:
+        return value
+
+    try:
+        return st.secrets[key]
+    except Exception:
+        return None
+
+
+api_key = get_config_value("OPENAI_API_KEY")
 
 client = None
 
@@ -20,7 +27,13 @@ if api_key:
     client = OpenAI(api_key=api_key)
 
 
+@traceable(name="OpenAI LLM Call")
 def call_openai(prompt: str, return_usage: bool = False):
+
+    if client is None:
+        raise ValueError(
+            "OPENAI_API_KEY is missing. Please set it in .env, Azure Key Vault, or Streamlit secrets."
+        )
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
