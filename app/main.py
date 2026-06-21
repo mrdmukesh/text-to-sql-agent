@@ -28,7 +28,7 @@ from ui.pages.chunking_page import render_chunking_lab
 from ui.pages.coming_soon import render_coming_soon
 from ui.pages.rag_assistant_page import render_rag_assistant
 from ui.pages.azure_sql_text_to_sql_page import render_azure_sql_text_to_sql
-
+from ui.architecture_view import render_architecture_page
 
 # =========================================================
 # PAGE CONFIG - MUST BE FIRST STREAMLIT COMMAND
@@ -43,7 +43,7 @@ st.set_page_config(
 # =========================================================
 # DEMO MODE CONFIG
 # =========================================================
-DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 st.sidebar.info("Demo Mode: ON" if DEMO_MODE else "Live Azure Mode: ON")
 
@@ -134,6 +134,8 @@ if "selected_tool" not in st.session_state:
     st.session_state.selected_tool = "🏠 Dashboard"
 
 
+
+
 # =========================================================
 # LOGIN PAGE
 # =========================================================
@@ -148,9 +150,10 @@ else:
     "name": "Demo User",
     "role": "Demo Viewer",
     "query_count": 0,
-    "query_limit": 100,
-    "remaining_queries": 100,
-    "is_admin": False
+    "query_limit": 5,
+    "remaining_queries": 5,
+    "is_unlocked": False,
+    "plan": "demo"
 }
 
 
@@ -208,6 +211,9 @@ elif selected_tool == "🧾 Receipt Claim Assistant":
 
 elif selected_tool == "🐯 Animal Face Transformer":
     render_animal_transform()
+
+elif selected_tool == "🏗️ Solution Architecture":
+    render_architecture_page()
 
 elif selected_tool == "🐦 Bird Voice Generator":
     render_coming_soon(

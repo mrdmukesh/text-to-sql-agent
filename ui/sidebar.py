@@ -85,6 +85,7 @@ def render_sidebar():
             "🚀 Select Tool",
             [
                 "🏠 Dashboard",
+                "🏗️ Solution Architecture",
                 "📊 Text-to-SQL",
                 "📈 AI Data Insights + Charts",
                 "☁️ Azure SQL Text-to-SQL",
