@@ -29,6 +29,36 @@ from ui.pages.coming_soon import render_coming_soon
 from ui.pages.rag_assistant_page import render_rag_assistant
 from ui.pages.azure_sql_text_to_sql_page import render_azure_sql_text_to_sql
 
+
+# =========================================================
+# PAGE CONFIG - MUST BE FIRST STREAMLIT COMMAND
+# =========================================================
+st.set_page_config(
+    page_title="GenAI Studio Lab",
+    page_icon="🧠",
+    layout="wide"
+)
+
+
+# =========================================================
+# DEMO MODE CONFIG
+# =========================================================
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+
+st.sidebar.info("Demo Mode: ON" if DEMO_MODE else "Live Azure Mode: ON")
+
+if "demo_requests" not in st.session_state:
+    st.session_state.demo_requests = 0
+
+MAX_DEMO_REQUESTS = 5
+
+if DEMO_MODE:
+    st.info(
+        "This is a portfolio demo. Azure live services are paused to control cost. "
+        "Demo responses are generated from sample data where live Azure access is not available."
+    )
+
+
 # =========================================================
 # HELPER: ENV FIRST, STREAMLIT SECRETS FALLBACK
 # =========================================================
@@ -53,12 +83,6 @@ init_history_db()
 init_usage_db()
 init_claim_db()
 
-st.set_page_config(
-    page_title="GenAI Studio Lab",
-    page_icon="🧠",
-    layout="wide"
-)
-
 apply_styles()
 
 
@@ -74,21 +98,24 @@ USER_INFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo"
 GOOGLE_CLIENT_ID = get_config_value("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = get_config_value("GOOGLE_CLIENT_SECRET")
 
-if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-    st.error(
-        "Google OAuth credentials are missing. "
-        "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env, Docker env, Azure App Settings, or Streamlit secrets."
-    )
-    st.stop()
+if not DEMO_MODE:
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        st.error(
+            "Google OAuth credentials are missing. "
+            "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env, Docker env, Azure App Settings, or Streamlit secrets."
+        )
+        st.stop()
 
-oauth2 = OAuth2Component(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    AUTHORIZE_URL,
-    TOKEN_URL,
-    REFRESH_TOKEN_URL,
-    REVOKE_TOKEN_URL
-)
+    oauth2 = OAuth2Component(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        AUTHORIZE_URL,
+        TOKEN_URL,
+        REFRESH_TOKEN_URL,
+        REVOKE_TOKEN_URL
+    )
+else:
+    oauth2 = None
 
 
 # =========================================================
@@ -110,9 +137,21 @@ if "selected_tool" not in st.session_state:
 # =========================================================
 # LOGIN PAGE
 # =========================================================
-if st.session_state.user is None:
-    render_login_page(oauth2, USER_INFO_URL)
-    st.stop()
+if not DEMO_MODE:
+    if st.session_state.user is None:
+        render_login_page(oauth2, USER_INFO_URL)
+        st.stop()
+else:
+   st.session_state.user = {
+    "id": 0,
+    "email": "demo.user@portfolio.com",
+    "name": "Demo User",
+    "role": "Demo Viewer",
+    "query_count": 0,
+    "query_limit": 100,
+    "remaining_queries": 100,
+    "is_admin": False
+}
 
 
 # =========================================================
@@ -148,6 +187,11 @@ elif selected_tool == "📊 Text-to-SQL":
     render_text_to_sql()
 
 elif selected_tool == "☁️ Azure SQL Text-to-SQL":
+    if DEMO_MODE:
+        st.warning(
+            "Azure SQL live connection is disabled in demo mode to control cost. "
+            "This page can be demonstrated with sample SQL questions or enabled in live mode."
+        )
     render_azure_sql_text_to_sql()
 
 elif selected_tool == "📈 AI Data Insights + Charts":
