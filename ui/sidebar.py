@@ -1,11 +1,8 @@
 import os
 import pandas as pd
 import streamlit as st
-from ui.pages.chunking_page import render_chunking_lab
-from services.file_upload_service import (
-    save_csv_to_sqlite,
-    UPLOAD_DB
-)
+
+from services.file_upload_service import UPLOAD_DB
 
 from services.history_service import (
     get_user_history,
@@ -26,105 +23,111 @@ from services.token_usage_service import (
 
 
 def render_sidebar():
+    user = st.session_state.get("user", {})
+    role = user.get("role", "user")
+    is_demo_user = role == "Demo Viewer"
 
     with st.sidebar:
+        st.title("🧠 GenAI Studio")
+        st.caption("AI Data Intelligence Platform")
 
-        st.title("🧭 Control Panel")
+        st.markdown("---")
 
-        st.success(f"Logged in: {st.session_state.user['email']}")
-        st.caption(f"Role: {st.session_state.user['role']}")
+        st.subheader("👤 User")
+        st.success(user.get("email", "demo.user@portfolio.com"))
+        st.caption(f"Role: {role}")
 
-        if st.session_state.user["role"] != "admin":
+        if role == "admin":
+            st.caption("Access: Unlimited Admin")
+        elif is_demo_user:
+            st.caption("Access: Portfolio Demo")
+            st.caption("Used Queries: 0/5")
+        else:
             st.caption(
                 f"Used Queries: "
-                f"{st.session_state.user['query_count']}/"
-                f"{st.session_state.user['query_limit']}"
+                f"{user.get('query_count', 0)}/"
+                f"{user.get('query_limit', 5)}"
             )
 
-        token_stats = get_user_token_usage(st.session_state.user["id"])
-        st.caption(f"Tokens Used: {token_stats['total_tokens']}")
-        st.caption(f"Estimated Cost: ${token_stats['estimated_cost']}")
+        if is_demo_user:
+            token_stats = {
+                "total_tokens": 0,
+                "estimated_cost": 0
+            }
+        else:
+            try:
+                token_stats = get_user_token_usage(user.get("id"))
+            except Exception:
+                token_stats = {
+                    "total_tokens": 0,
+                    "estimated_cost": 0
+                }
 
-        if st.button("Logout"):
-            st.session_state.user = None
-            st.session_state.chat = []
+        st.caption(f"Tokens Used: {token_stats.get('total_tokens', 0)}")
+        st.caption(f"Estimated Cost: ${token_stats.get('estimated_cost', 0)}")
+
+        if st.button("🚪 Logout", use_container_width=True):
+            for key in [
+                "user",
+                "chat",
+                "pending_question",
+                "selected_tool",
+                "demo_requests"
+            ]:
+                if key in st.session_state:
+                    del st.session_state[key]
+
             st.rerun()
 
         st.markdown("---")
 
         selected_tool = st.radio(
             "🚀 Select Tool",
-            
-               [
-                    "🏠 Dashboard",
-                    "📊 Text-to-SQL",
-                    "📈 AI Data Insights + Charts",
-                    "☁️ Azure SQL Text-to-SQL",
-                    "🧩 RAG Chunking Strategy Lab",
-                    "🤖 Enterprise RAG Assistant",
-                    "🧾 Receipt Claim Assistant",
-                    "🐯 Animal Face Transformer",
-                    "🐦 Bird Voice Generator"
-                ]
-            
+            [
+                "🏠 Dashboard",
+                "📊 Text-to-SQL",
+                "📈 AI Data Insights + Charts",
+                "☁️ Azure SQL Text-to-SQL",
+                "🧩 RAG Chunking Strategy Lab",
+                "🤖 Enterprise RAG Assistant",
+                "🧾 Receipt Claim Assistant",
+                "🐯 Animal Face Transformer",
+                "🐦 Bird Voice Generator"
+            ]
         )
-
-        st.markdown("---")
-
-        st.subheader("📂 Data Upload")
-
-        uploaded_files = st.file_uploader(
-            "Upload CSV files",
-            type=["csv"],
-            accept_multiple_files=True
-        )
-
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                try:
-                    uploaded_file.seek(0)
-                    table_name, columns = save_csv_to_sqlite(uploaded_file)
-
-                    st.success(f"Uploaded: {uploaded_file.name}")
-                    st.caption(f"Table: {table_name}")
-                    st.write(columns)
-
-                    uploaded_file.seek(0)
-                    df_preview = pd.read_csv(uploaded_file)
-
-                    with st.expander(f"Preview {uploaded_file.name}"):
-                        st.dataframe(df_preview)
-
-                except Exception as e:
-                    st.error(f"Upload failed for {uploaded_file.name}: {str(e)}")
 
         st.markdown("---")
 
         with st.expander("🕘 My Recent Queries", expanded=False):
-            history_rows = get_user_history(st.session_state.user["id"])
-
-            if history_rows:
-                for h in history_rows:
-                    question, sql_query, answer, status, created_at = h
-                    st.markdown(f"**{created_at}**")
-                    st.write(question)
-                    st.code(sql_query, language="sql")
-                    st.caption(status)
-                    st.markdown("---")
+            if is_demo_user:
+                st.info("Query history is disabled in portfolio demo mode.")
             else:
-                st.info("No history yet.")
+                try:
+                    history_rows = get_user_history(user.get("id"))
 
-        if st.session_state.user["role"] == "admin":
+                    if history_rows:
+                        for h in history_rows:
+                            question, sql_query, answer, status, created_at = h
+                            st.markdown(f"**{created_at}**")
+                            st.write(question)
+                            st.code(sql_query, language="sql")
+                            st.caption(status)
+                            st.markdown("---")
+                    else:
+                        st.info("No history yet.")
+
+                except Exception as e:
+                    st.warning(f"Unable to load query history: {str(e)}")
+
+        if role == "admin":
             render_admin_panel()
 
         return selected_tool
 
 
 def render_admin_panel():
-
     with st.expander("🛡️ Admin Panel", expanded=False):
-
-        st.subheader("📊 Analytics")
+        st.subheader("📊 Platform Analytics")
 
         user_stats = get_user_analytics()
         history_stats = get_history_analytics()
@@ -132,17 +135,17 @@ def render_admin_panel():
         c1, c2 = st.columns(2)
 
         with c1:
-            st.metric("Users", user_stats["total_users"])
-            st.metric("Active", user_stats["active_users"])
-            st.metric("Blocked", user_stats["blocked_users"])
+            st.metric("Users", user_stats.get("total_users", 0))
+            st.metric("Active", user_stats.get("active_users", 0))
+            st.metric("Blocked", user_stats.get("blocked_users", 0))
 
         with c2:
-            st.metric("Queries", history_stats["total_queries"])
-            st.metric("Success", history_stats["successful_queries"])
-            st.metric("Failed", history_stats["failed_queries"])
+            st.metric("Queries", history_stats.get("total_queries", 0))
+            st.metric("Success", history_stats.get("successful_queries", 0))
+            st.metric("Failed", history_stats.get("failed_queries", 0))
 
         st.markdown("---")
-        st.markdown("### 💰 Token Usage Analytics")
+        st.markdown("### 💰 Token Usage")
 
         usage_rows = get_all_token_usage()
 
@@ -156,19 +159,19 @@ def render_admin_panel():
                     "Estimated Cost ($)"
                 ]
             )
-            st.dataframe(usage_df)
+            st.dataframe(usage_df, use_container_width=True)
         else:
             st.info("No token usage found yet.")
 
         st.markdown("---")
         st.markdown("### 🏆 Top Users")
 
-        if history_stats["top_users"]:
+        if history_stats.get("top_users"):
             top_users_df = pd.DataFrame(
                 history_stats["top_users"],
                 columns=["User Email", "Query Count"]
             )
-            st.dataframe(top_users_df)
+            st.dataframe(top_users_df, use_container_width=True)
         else:
             st.info("No query usage yet.")
 
@@ -178,7 +181,12 @@ def render_admin_panel():
         users = get_all_users()
 
         for u in users:
-            user_id, name, email, role, is_active, query_limit, query_count = u
+            user_id = u[0]
+            email = u[2]
+            role = u[3]
+            is_active = u[4]
+            query_limit = u[5]
+            query_count = u[6]
 
             st.write(
                 f"**{email}** | {role} | "
@@ -197,7 +205,7 @@ def render_admin_panel():
 
         st.markdown("---")
 
-        if st.button("🗑️ Clear Uploaded Data"):
+        if st.button("🗑️ Clear Uploaded Data", use_container_width=True):
             if os.path.exists(UPLOAD_DB):
                 os.remove(UPLOAD_DB)
                 st.success("Uploaded data cleared.")
